@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Scanner Gestione Listini</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 18px;
+      background: #f3f5f7;
+      color: #202124;
+      font-family: Arial, sans-serif;
+    }
+    main {
+      max-width: 520px;
+      margin: 12px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px #00000012;
+    }
+    h1 { margin: 0 0 8px; font-size: 23px; }
+    p { line-height: 1.4; }
+    button {
+      width: 100%;
+      padding: 15px;
+      margin: 8px 0;
+      border: 0;
+      border-radius: 10px;
+      background: #1769aa;
+      color: white;
+      font-size: 17px;
+      font-weight: bold;
+    }
+    button.secondary { background: #5f6368; }
+    #reader { width: 100%; margin-top: 14px; }
+    #stato { margin: 14px 0 6px; color: #555; }
+    #risultato {
+      min-height: 58px;
+      padding: 16px;
+      margin-top: 8px;
+      border: 2px solid #1769aa;
+      border-radius: 10px;
+      background: #eef6ff;
+      font-size: 24px;
+      font-weight: bold;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
+    #copia { background: #188038; }
+    .nota { font-size: 13px; color: #666; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Scanner Gestione Listini</h1>
+  <p>Premi AVVIA e inquadra il codice a barre dell'articolo.</p>
+
+  <button id="avvia">AVVIA SCANNER</button>
+  <button id="chiudi" class="secondary">CHIUDI SCANNER</button>
+
+  <div id="stato">Pronto. Premi “AVVIA SCANNER”.</div>
+  <div id="reader"></div>
+  <div id="risultato">Nessun codice letto</div>
+
+  <button id="copia" style="display:none">COPIA CODICE</button>
+
+  <p class="nota">
+    Il numero riconosciuto compare nel riquadro azzurro.
+    Consenti l'accesso alla fotocamera se richiesto.
+  </p>
+</main>
+
+<script>
+(() => {
+  const stato = document.getElementById('stato');
+  const risultato = document.getElementById('risultato');
+  const avvia = document.getElementById('avvia');
+  const chiudi = document.getElementById('chiudi');
+  const copia = document.getElementById('copia');
+
+  let scanner = null;
+  let attivo = false;
+  let ultimoCodice = '';
+
+  function beep() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AC();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.frequency.value = 880;
+      gain.gain.value = 0.08;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+      osc.onended = () => ctx.close();
+    } catch (e) {}
+  }
+
+  async function fermaScanner() {
+    if (scanner && attivo) {
+      try { await scanner.stop(); } catch (e) {}
+      try { await scanner.clear(); } catch (e) {}
+    }
+
+    attivo = false;
+    scanner = null;
+    stato.textContent = 'Scanner chiuso.';
+  }
+
+  avvia.addEventListener('click', async () => {
+    if (attivo) return;
+
+    if (typeof Html5Qrcode === 'undefined') {
+      stato.textContent =
+        'ERRORE: libreria scanner non caricata. Controlla internet e ricarica la pagina.';
+      return;
+    }
+
+    risultato.textContent = 'In attesa del codice...';
+    copia.style.display = 'none';
+    stato.textContent = 'Avvio fotocamera...';
+
+    try {
+      scanner = new Html5Qrcode('reader');
+
+      const config = {
+        fps: 12,
+        qrbox: { width: 280, height: 150 },
+        aspectRatio: 1.6,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.ITF
+        ],
+        rememberLastUsedCamera: true
+      };
+
+      await scanner.start(
+        { facingMode: 'environment' },
+        config,
+        decodedText => {
+          if (!decodedText || decodedText === ultimoCodice) return;
+
+          ultimoCodice = decodedText;
+          risultato.textContent = decodedText;
+          stato.textContent = 'CODICE RICONOSCIUTO';
+          copia.style.display = 'block';
+          beep();
+        },
+        () => {}
+      );
+
+      attivo = true;
+      stato.textContent = 'Fotocamera attiva. Inquadra il codice a barre.';
+
+    } catch (e) {
+      stato.textContent =
+        'ERRORE FOTOCAMERA: ' +
+        (e && e.message ? e.message : String(e));
+
+      attivo = false;
+      scanner = null;
+    }
+  });
+
+  chiudi.addEventListener('click', fermaScanner);
+
+  copia.addEventListener('click', async () => {
+    if (!ultimoCodice) return;
+
+    try {
+      await navigator.clipboard.writeText(ultimoCodice);
+      stato.textContent = 'Codice copiato.';
+    } catch (e) {
+      stato.textContent =
+        'Codice: ' + ultimoCodice + ' (copialo manualmente).';
+    }
+  });
+
+  window.addEventListener('pagehide', fermaScanner);
+})();
+</script>
+</body>
+</html>
