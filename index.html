@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scanner Gestione Listini</title>
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f3f5f7;
+      color: #222;
+      text-align: center;
+    }
+    main {
+      max-width: 480px;
+      margin: 30px auto;
+      padding: 22px;
+      background: white;
+      border-radius: 16px;
+    }
+    h1 { font-size: 24px; }
+    button {
+      width: 100%;
+      padding: 16px;
+      margin: 10px 0;
+      border: 0;
+      border-radius: 10px;
+      background: #1769aa;
+      color: white;
+      font-size: 17px;
+    }
+    #video {
+      width: 100%;
+      margin-top: 12px;
+      border-radius: 10px;
+    }
+    #risultato {
+      font-size: 22px;
+      font-weight: bold;
+      overflow-wrap: anywhere;
+      margin-top: 18px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Scanner Gestione Listini</h1>
+    <p>Inquadra il codice a barre dell'articolo.</p>
+    <button id="avvia">AVVIA SCANNER</button>
+    <button id="chiudi">CHIUDI SCANNER</button>
+    <video id="video" muted playsinline></video>
+    <div id="risultato">In attesa di scansione</div>
+  </main>
+
+  <script>
+    const video = document.getElementById('video');
+    const risultato = document.getElementById('risultato');
+    let scanner = null;
+
+    document.getElementById('avvia').addEventListener('click', async () => {
+      try {
+        if (!window.ZXing) {
+          throw new Error('Libreria scanner non caricata. Ricarica la pagina.');
+        }
+        scanner = new ZXing.BrowserMultiFormatReader();
+        risultato.textContent = 'Inquadra il codice...';
+
+        await scanner.decodeFromVideoDevice(
+          undefined,
+          video,
+          (result, error) => {
+            if (result) {
+              risultato.textContent = 'Codice: ' + result.getText();
+              try {
+                const audio = new AudioContext();
+                const oscillator = audio.createOscillator();
+                oscillator.connect(audio.destination);
+                oscillator.start();
+                oscillator.stop(audio.currentTime + 0.12);
+              } catch (e) {}
+            }
+          }
+        );
+      } catch (errore) {
+        risultato.textContent = 'Errore: ' + errore.message;
+      }
+    });
+
+    document.getElementById('chiudi').addEventListener('click', () => {
+      if (scanner) scanner.reset();
+      video.srcObject = null;
+      risultato.textContent = 'Scanner chiuso';
+    });
+  </script>
+</body>
+</html>
