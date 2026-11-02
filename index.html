@@ -1,138 +1,113 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Scanner Gestione Listini</title>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 18px;
-      background: #f3f5f7;
-      color: #202124;
-      font-family: Arial, sans-serif;
-    }
-    main {
-      max-width: 520px;
-      margin: 12px auto;
-      padding: 20px;
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 2px 12px #00000012;
-    }
-    h1 { margin: 0 0 8px; font-size: 23px; }
-    p { line-height: 1.4; }
-    button {
-      width: 100%;
-      padding: 15px;
-      margin: 8px 0;
-      border: 0;
-      border-radius: 10px;
-      background: #1769aa;
-      color: white;
-      font-size: 17px;
-      font-weight: bold;
-    }
-    button.secondary { background: #5f6368; }
-    #reader { width: 100%; margin-top: 14px; }
-    #stato { margin: 14px 0 6px; color: #555; }
-    #risultato {
-      min-height: 58px;
-      padding: 16px;
-      margin-top: 8px;
-      border: 2px solid #1769aa;
-      border-radius: 10px;
-      background: #eef6ff;
-      font-size: 24px;
-      font-weight: bold;
-      overflow-wrap: anywhere;
-      text-align: center;
-    }
-    #copia { background: #188038; }
-    .nota { font-size: 13px; color: #666; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Scanner Gestione Listini</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:18px;background:#f3f5f7;color:#202124;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+main{max-width:520px;margin:12px auto;padding:20px;background:#fff;border-radius:16px;box-shadow:0 2px 12px #00000012}
+h1{margin:0 0 8px;font-size:23px}
+p{line-height:1.4}
+button{width:100%;padding:15px;margin:8px 0;border:0;border-radius:10px;background:#1769aa;color:white;font-size:17px;font-weight:bold}
+button.finish{background:#188038}
+button:disabled{opacity:.55}
+#reader{width:100%;margin-top:14px}
+#stato{margin:14px 0 6px;color:#444;min-height:42px}
+#risultato{min-height:70px;padding:14px;margin-top:8px;border:2px solid #1769aa;border-radius:10px;background:#eef6ff;font-size:17px;font-weight:bold;overflow-wrap:anywhere;text-align:center}
+.nota{font-size:13px;color:#666}
+</style>
 </head>
 <body>
 <main>
-  <h1>Scanner Gestione Listini</h1>
-  <p>Premi AVVIA e inquadra il codice a barre dell'articolo.</p>
-
-  <button id="avvia">AVVIA SCANNER</button>
-  <button id="chiudi" class="secondary">CHIUDI SCANNER</button>
-
-  <div id="stato">Pronto. Premi “AVVIA SCANNER”.</div>
-  <div id="reader"></div>
-  <div id="risultato">Nessun codice letto</div>
-
-  <button id="copia" style="display:none">COPIA CODICE</button>
-
-  <p class="nota">
-    Il numero riconosciuto compare nel riquadro azzurro.
-    Consenti l'accesso alla fotocamera se richiesto.
-  </p>
+<h1>Scanner Gestione Listini</h1>
+<p>Inquadra un codice a barre. Se l’articolo è presente nel listino, qui vedrai nome e prezzo e verrà aggiunto alla lista nella pagina principale. La fotocamera resta attiva per le scansioni successive.</p>
+<button id="avvia">AVVIA SCANNER</button>
+<div id="stato" aria-live="polite">Premi AVVIA SCANNER e consenti l’accesso alla fotocamera.</div>
+<div id="reader"></div>
+<div id="risultato">In attesa del primo articolo</div>
+<button id="fine" class="finish">FINE — TERMINA SCANSIONE</button>
+<p class="nota">Per continuare, lascia aperta questa pagina. I doppioni non vengono inseriti una seconda volta.</p>
 </main>
-
 <script>
 (() => {
   const stato = document.getElementById('stato');
   const risultato = document.getElementById('risultato');
   const avvia = document.getElementById('avvia');
-  const chiudi = document.getElementById('chiudi');
-  const copia = document.getElementById('copia');
-
-  let scanner = null;
-  let attivo = false;
-  let ultimoCodice = '';
+  const fine = document.getElementById('fine');
+  let scanner = null, attivo = false, ultimoCodice = '', ultimoInvio = 0;
+  let audioContext = null, terminato = false;
 
   function beep() {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AC();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.frequency.value = 880;
-      gain.gain.value = 0.08;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.12);
-      osc.onended = () => ctx.close();
-    } catch (e) {}
+      if (!AC) return;
+      audioContext = audioContext || new AC();
+      if (audioContext.state === 'suspended') audioContext.resume();
+      const now = audioContext.currentTime;
+      [1050,1450].forEach((freq,i) => {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, now + i*0.13);
+        gain.gain.exponentialRampToValueAtTime(0.20, now + i*0.13 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i*0.13 + 0.105);
+        osc.connect(gain); gain.connect(audioContext.destination);
+        osc.start(now + i*0.13); osc.stop(now + i*0.13 + 0.11);
+      });
+    } catch(e) {}
   }
+
+  function inviaCodice(codice) {
+    if (!window.opener || window.opener.closed) {
+      stato.textContent = 'Collegamento alla pagina principale assente. Riapri lo scanner da Gestione Listini.';
+      return;
+    }
+    window.opener.postMessage({type:'GESTIONE_LISTINI_BARCODE', code:codice}, '*');
+    stato.textContent = 'Codice letto. Verifica articolo nel listino...';
+  }
+
+  window.addEventListener('message', event => {
+    if (event.source !== window.opener) return;
+    const d = event.data;
+    if (!d || d.type !== 'GESTIONE_LISTINI_SCAN_RESULT') return;
+    if (d.found) {
+      risultato.textContent = (d.duplicate ? 'GIÀ PRESENTE\n' : 'AGGIUNTO\n') +
+        (d.name || 'Articolo') + '\n' + (d.price || '');
+      stato.textContent = d.duplicate
+        ? 'Questo articolo era già nella lista. Inquadra il prossimo.'
+        : 'Articolo aggiunto correttamente. Puoi inquadrare il prossimo.';
+    } else {
+      risultato.textContent = 'ARTICOLO NON TROVATO';
+      stato.textContent = 'Non presente nel listino. Puoi cercarlo per nome nella pagina principale.';
+    }
+  });
 
   async function fermaScanner() {
     if (scanner && attivo) {
-      try { await scanner.stop(); } catch (e) {}
-      try { await scanner.clear(); } catch (e) {}
+      try { await scanner.stop(); } catch(e) {}
+      try { await scanner.clear(); } catch(e) {}
     }
-
     attivo = false;
     scanner = null;
-    stato.textContent = 'Scanner chiuso.';
   }
 
   avvia.addEventListener('click', async () => {
-    if (attivo) return;
-
+    if (attivo || terminato) return;
     if (typeof Html5Qrcode === 'undefined') {
-      stato.textContent =
-        'ERRORE: libreria scanner non caricata. Controlla internet e ricarica la pagina.';
+      stato.textContent = 'Scanner non caricato. Controlla la connessione e ricarica la pagina.';
       return;
     }
-
-    risultato.textContent = 'In attesa del codice...';
-    copia.style.display = 'none';
+    avvia.disabled = true;
     stato.textContent = 'Avvio fotocamera...';
-
     try {
       scanner = new Html5Qrcode('reader');
-
       const config = {
-        fps: 12,
-        qrbox: { width: 280, height: 150 },
+        fps: 15,
+        qrbox: {width:300,height:130},
         aspectRatio: 1.6,
         formatsToSupport: [
           Html5QrcodeSupportedFormats.EAN_13,
@@ -145,56 +120,40 @@
         ],
         rememberLastUsedCamera: true
       };
-
-            await scanner.start(
-        { facingMode: 'environment' },
-        config,
-        decodedText => {
-          if (!decodedText || decodedText === ultimoCodice) return;
-
-          ultimoCodice = decodedText;
-          risultato.textContent = decodedText;
-          stato.textContent = 'CODICE RICONOSCIUTO';
-          copia.style.display = 'block';
-          beep();
-
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage({
-              type: 'GESTIONE_LISTINI_BARCODE',
-              code: decodedText
-            }, 'https://script.google.com');
-          }
-        },
-        () => {}
-      );
-
+      await scanner.start({facingMode:'environment'}, config, decoded => {
+        const code = String(decoded || '').trim();
+        const now = Date.now();
+        if (!code || (code === ultimoCodice && now - ultimoInvio < 2200)) return;
+        ultimoCodice = code;
+        ultimoInvio = now;
+        beep();
+        inviaCodice(code);
+      }, () => {});
       attivo = true;
-      stato.textContent = 'Fotocamera attiva. Inquadra il codice a barre.';
-    } catch (e) {
-      stato.textContent =
-        'ERRORE FOTOCAMERA: ' +
-        (e && e.message ? e.message : String(e));
-
-      attivo = false;
+      avvia.textContent = 'FOTOCAMERA ATTIVA';
+      stato.textContent = 'Fotocamera attiva. Inquadra il primo codice.';
+    } catch(e) {
+      stato.textContent = 'Errore fotocamera: ' + (e && e.message ? e.message : String(e));
       scanner = null;
+      attivo = false;
+      avvia.disabled = false;
+      avvia.textContent = 'RIPROVA AD AVVIARE';
     }
   });
 
-  chiudi.addEventListener('click', fermaScanner);
-
-  copia.addEventListener('click', async () => {
-    if (!ultimoCodice) return;
-
-    try {
-      await navigator.clipboard.writeText(ultimoCodice);
-      stato.textContent = 'Codice copiato.';
-    } catch (e) {
-      stato.textContent =
-        'Codice: ' + ultimoCodice + ' (copialo manualmente).';
+  fine.addEventListener('click', async () => {
+    terminato = true;
+    fine.disabled = true;
+    stato.textContent = 'Chiusura scanner...';
+    await fermaScanner();
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage({type:'GESTIONE_LISTINI_SCAN_FINISH'}, '*');
     }
+    stato.textContent = 'Scansione terminata. Torna a Gestione Listini.';
+    setTimeout(() => { try { window.close(); } catch(e) {} }, 400);
   });
 
-  window.addEventListener('pagehide', fermaScanner);
+  window.addEventListener('pagehide', () => { fermaScanner(); });
 })();
 </script>
 </body>
