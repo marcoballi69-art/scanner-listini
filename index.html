@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="it">
 <head>
 <meta charset="UTF-8">
@@ -7,29 +7,25 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box}
-body{margin:0;padding:18px;background:#f3f5f7;color:#202124;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
-main{max-width:520px;margin:12px auto;padding:20px;background:#fff;border-radius:16px;box-shadow:0 2px 12px #00000012}
-h1{margin:0 0 8px;font-size:23px}
-p{line-height:1.4}
-button{width:100%;padding:15px;margin:8px 0;border:0;border-radius:10px;background:#1769aa;color:white;font-size:17px;font-weight:bold}
+body{margin:0;padding:6px;background:#f3f5f7;color:#202124;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+main{max-width:620px;margin:0 auto;padding:8px;background:#fff;border-radius:12px;box-shadow:0 2px 12px #00000012}
+button{width:100%;padding:12px;margin:5px 0;border:0;border-radius:10px;background:#1769aa;color:white;font-size:17px;font-weight:bold}
 button.finish{background:#188038}
 button:disabled{opacity:.55}
-#reader{width:100%;margin-top:14px}
-#stato{margin:14px 0 6px;color:#444;min-height:42px}
-#risultato{min-height:70px;padding:14px;margin-top:8px;border:2px solid #1769aa;border-radius:10px;background:#eef6ff;font-size:17px;font-weight:bold;overflow-wrap:anywhere;text-align:center}
-.nota{font-size:13px;color:#666}
+#risultato{min-height:104px;padding:12px;margin:5px 0;border:2px solid #1769aa;border-radius:10px;background:#eef6ff;font-size:23px;line-height:1.3;font-weight:bold;white-space:pre-line;overflow-wrap:anywhere;text-align:center;display:flex;align-items:center;justify-content:center}
+#reader{width:100%;margin:4px 0 0}
+#reader video{object-fit:cover}
+#stato{margin:4px 2px;color:#555;min-height:20px;font-size:13px;text-align:center}
+@media(max-width:600px){main{padding:6px}#risultato{min-height:112px;font-size:25px}button{padding:11px}}
 </style>
 </head>
 <body>
 <main>
-<h1>Scanner Gestione Listini</h1>
-<p>Inquadra un codice a barre. Se l’articolo è presente nel listino, qui vedrai nome e prezzo e verrà aggiunto alla lista nella pagina principale. La fotocamera resta attiva per le scansioni successive.</p>
 <button id="avvia">AVVIA SCANNER</button>
-<div id="stato" aria-live="polite">Premi AVVIA SCANNER e consenti l’accesso alla fotocamera.</div>
-<div id="reader"></div>
 <div id="risultato">In attesa del primo articolo</div>
+<div id="stato" aria-live="polite">Fotocamera pronta</div>
+<div id="reader"></div>
 <button id="fine" class="finish">FINE — TERMINA SCANSIONE</button>
-<p class="nota">Per continuare, lascia aperta questa pagina. I doppioni non vengono inseriti una seconda volta.</p>
 </main>
 <script>
 (() => {
@@ -106,9 +102,11 @@ button:disabled{opacity:.55}
     try {
       scanner = new Html5Qrcode('reader');
       const config = {
-        fps: 15,
-        qrbox: {width:300,height:130},
-        aspectRatio: 1.6,
+        fps: 20,
+        qrbox: (viewfinderWidth, viewfinderHeight) => ({
+          width: Math.floor(viewfinderWidth * 0.94),
+          height: Math.floor(viewfinderHeight * 0.58)
+        }),
         formatsToSupport: [
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
@@ -131,7 +129,7 @@ button:disabled{opacity:.55}
       }, () => {});
       attivo = true;
       avvia.textContent = 'FOTOCAMERA ATTIVA';
-      stato.textContent = 'Fotocamera attiva. Inquadra il primo codice.';
+      stato.textContent = 'Fotocamera attiva';
     } catch(e) {
       stato.textContent = 'Errore fotocamera: ' + (e && e.message ? e.message : String(e));
       scanner = null;
