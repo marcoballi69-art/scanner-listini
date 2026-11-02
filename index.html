@@ -149,7 +149,7 @@
       await scanner.start(
         { facingMode: 'environment' },
         config,
-        decodedText => {
+                decodedText => {
           if (!decodedText || decodedText === ultimoCodice) return;
 
           ultimoCodice = decodedText;
@@ -157,11 +157,14 @@
           stato.textContent = 'CODICE RICONOSCIUTO';
           copia.style.display = 'block';
           beep();
-        },
-        () => {}
-      );
 
-      attivo = true;
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({
+              type: 'GESTIONE_LISTINI_BARCODE',
+              code: decodedText
+            }, 'https://script.google.com');
+          }
+        },      attivo = true;
       stato.textContent = 'Fotocamera attiva. Inquadra il codice a barre.';
 
     } catch (e) {
